@@ -1,0 +1,42 @@
+name: Generate Contribution Universe
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  universe:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Generate Universe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_USERNAME: try-it-lakshya
+        run: |
+          node scripts/generate-universe.mjs
+
+      - name: Commit Universe
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add assets/contribution-universe.svg
+
+          git diff --cached --quiet || \
+            git commit -m "🌌 Update contribution universe"
+
+          git push
