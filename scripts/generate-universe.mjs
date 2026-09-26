@@ -21,6 +21,22 @@ query($login: String!) {
           }
         }
       }
+      commitContributionsByRepository(maxRepositories: 100) {
+        repository { nameWithOwner isPrivate }
+        contributions(first: 100) { nodes { occurredAt commitCount } }
+      }
+      pullRequestContributionsByRepository(maxRepositories: 100) {
+        repository { nameWithOwner isPrivate }
+        contributions(first: 100) { nodes { occurredAt } }
+      }
+      issueContributionsByRepository(maxRepositories: 100) {
+        repository { nameWithOwner isPrivate }
+        contributions(first: 100) { nodes { occurredAt } }
+      }
+      pullRequestReviewContributionsByRepository(maxRepositories: 100) {
+        repository { nameWithOwner isPrivate }
+        contributions(first: 100) { nodes { occurredAt } }
+      }
     }
   }
 }
@@ -49,6 +65,31 @@ const calendar = json.data.user.contributionsCollection.contributionCalendar;
 
 const days = calendar.weeks.flatMap((week) => week.contributionDays);
 
+// date -> { repo name -> contribution count }
+const collection = json.data.user.contributionsCollection;
+const reposByDay = new Map();
+
+for (const key of [
+  "commitContributionsByRepository",
+  "pullRequestContributionsByRepository",
+  "issueContributionsByRepository",
+  "pullRequestReviewContributionsByRepository",
+]) {
+  for (const entry of collection[key]) {
+    // Never leak private repository names into the public JSON.
+    const name = entry.repository.isPrivate
+      ? "private repository"
+      : entry.repository.nameWithOwner;
+
+    for (const node of entry.contributions.nodes) {
+      const date = node.occurredAt.slice(0, 10);
+      const map = reposByDay.get(date) ?? new Map();
+      map.set(name, (map.get(name) ?? 0) + (node.commitCount ?? 1));
+      reposByDay.set(date, map);
+    }
+  }
+}
+
 const WIDTH = 1200;
 const HEIGHT = 520;
 
@@ -68,9 +109,9 @@ function random() {
 // contribution count -> visual importance (0 = invisible)
 function starImportance(count) {
   if (count <= 0) return 0;
-  if (count <= 2) return 0.08;
-  if (count <= 5) return 0.25;
-  if (count <= 9) return 0.5;
+  if (count <= 2) return 0.2;
+  if (count <= 5) return 0.4;
+  if (count <= 9) return 0.6;
   if (count <= 19) return 0.8;
   return 1.0;
 }
@@ -89,11 +130,8 @@ const stars = [];
 days.forEach((day, index) => {
   const count = day.contributionCount;
   const importance = starImportance(count);
-  const roll = random();
 
   if (importance === 0) return;
-  if (count <= 2 && roll >= 0.18) return;
-  if (count <= 5 && roll >= 0.45) return;
 
   const galaxy = galaxies[index % galaxies.length];
 
@@ -121,7 +159,7 @@ days.forEach((day, index) => {
 });
 
 // Constellations: only meaningful days, nearest neighbours, max 2 links each.
-const candidates = stars.filter((star) => star.contributionCount >= 3);
+const candidates = stars.filter((star) => star.contributionCount >= 1);
 const degree = new Map();
 const pairs = [];
 
@@ -155,6 +193,7 @@ const parent = new Map(stars.map((st) => [st, st]));
 const find = (n) => (parent.get(n) === n ? n : (parent.set(n, find(parent.get(n))), parent.get(n)));
 for (const [a, b] of linked) parent.set(find(a), find(b));
 
+const tip = (star) => star.size * 3;
 const clusters = new Map();
 for (const [a, b] of linked) {
   for (const n of [a, b]) {
@@ -173,8 +212,8 @@ for (const members of clusters.values()) {
   const rad = Math.max(...list.map((n) => Math.hypot(n.x - mx, n.y - my))) + 18;
   rings.push(`<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${rad.toFixed(1)}" fill="none" stroke="#8b9cff" stroke-width="0.5" stroke-dasharray="2 5" opacity="0.22"/>`);
   for (const n of list) {
-    if (n.contributionCount >= 6) {
-      rings.push(`<circle cx="${n.x.toFixed(2)}" cy="${n.y.toFixed(2)}" r="${(n.size + 5).toFixed(1)}" fill="none" stroke="#a5b4fc" stroke-width="0.6" opacity="0.4"/>`);
+    if (n.contributionCount >= 3) {
+      rings.push(`<circle cx="${n.x.toFixed(2)}" cy="${n.y.toFixed(2)}" r="${(tip(n) + 4).toFixed(1)}" fill="none" stroke="#a5b4fc" stroke-width="0.6" opacity="0.4"/>`);
     }
   }
 }
@@ -195,14 +234,24 @@ const nebulae = Array.from({ length: 4 }, () => {
   return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(100 + random() * 120).toFixed(1)}" ry="${(35 + random() * 50).toFixed(1)}" fill="url(#nebula)" opacity="0.62" filter="url(#blur)"/>`;
 }).join("");
 
+// Bigger days (3+) are 4-point stars with a soft glow; the rest are dots.
+const isBig = (star) => star.contributionCount >= 3;
+
 const starElements = stars
   .map((star, index) => {
-    const glow =
-      star.contributionCount >= 20
-        ? `<circle cx="${star.x.toFixed(2)}" cy="${star.y.toFixed(2)}" r="${(star.size * 3.5).toFixed(2)}" fill="#a78bfa" opacity="0.22" filter="url(#glow)"/>`
-        : "";
+    const x = star.x.toFixed(2);
+    const y = star.y.toFixed(2);
     const delay = `${(index % 9) * 0.4}s`;
-    return `${glow}<circle cx="${star.x.toFixed(2)}" cy="${star.y.toFixed(2)}" r="${star.size.toFixed(2)}" fill="#fff" opacity="${star.opacity.toFixed(2)}" ${star.importance >= 0.5 ? `class="star" style="animation-delay:${delay}"` : ""}/>`;
+    const cls = star.importance >= 0.4 ? `class="star" style="animation-delay:${delay}"` : "";
+
+    if (!isBig(star)) {
+      return `<circle cx="${x}" cy="${y}" r="${star.size.toFixed(2)}" fill="#fff" opacity="${star.opacity.toFixed(2)}" ${cls}/>`;
+    }
+
+    const R = tip(star).toFixed(2);
+    const glowOpacity = (0.16 + star.importance * 0.16).toFixed(2);
+    return `<circle cx="${x}" cy="${y}" r="${(tip(star) * 1.7).toFixed(2)}" fill="#a78bfa" opacity="${glowOpacity}" filter="url(#glow)"/>
+    <g transform="translate(${x} ${y})" ${cls}><path d="M0,-${R} Q0,0 ${R},0 Q0,0 0,${R} Q0,0 -${R},0 Q0,0 0,-${R}Z" fill="#fff" opacity="${star.opacity.toFixed(2)}"/><circle r="${(star.size * 0.55).toFixed(2)}" fill="#fff"/></g>`;
   })
   .join("\n    ");
 
@@ -249,7 +298,7 @@ const svg = `
   <circle cx="${cx}" cy="${cy}" r="35" fill="none" stroke="#8b9cff" stroke-width="0.5" opacity="0.12"/>
 
   <text x="42" y="54" fill="#fff" font-family="monospace" font-size="14" letter-spacing="3" opacity="0.85">CONTRIBUTION UNIVERSE</text>
-  <text x="42" y="78" fill="#94a3b8" font-family="monospace" font-size="11">${stars.length} STARS · ${days.length} DAYS</text>
+  <text x="42" y="78" fill="#94a3b8" font-family="monospace" font-size="11">${calendar.totalContributions} CONTRIBUTIONS · ${stars.length} ACTIVE DAYS</text>
   <text x="${WIDTH - 42}" y="${HEIGHT - 30}" text-anchor="end" fill="#64748b" font-family="monospace" font-size="10">github.com/${username}</text>
 
   <style>
@@ -267,6 +316,25 @@ fs.writeFileSync(
   svg
 );
 
+// GitHub hides which private repo a "restricted" contribution belongs to,
+// so any count not attributed to a repo is reported as private.
+function dayRepos(day) {
+  const repos = [...(reposByDay.get(day.date) ?? [])]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+
+  const known = repos.reduce((sum, r) => sum + r.count, 0);
+  const hidden = day.contributionCount - known;
+
+  if (hidden > 0) {
+    const priv = repos.find((r) => r.name === "private repository");
+    if (priv) priv.count += hidden;
+    else repos.push({ name: "private repository", count: hidden });
+  }
+
+  return repos;
+}
+
 // Data for the interactive universe (universe/index.html).
 fs.writeFileSync(
   "assets/contribution-data.json",
@@ -279,6 +347,7 @@ fs.writeFileSync(
         date: day.date,
         contributions: day.contributionCount,
         level: day.contributionLevel,
+        repos: dayRepos(day),
       })),
     },
     null,

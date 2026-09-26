@@ -6,6 +6,7 @@
   const tooltip = document.getElementById("tooltip");
   const tipCount = document.getElementById("tip-count");
   const tipDate = document.getElementById("tip-date");
+  const tipRepos = document.getElementById("tip-repos");
   const statsEl = document.getElementById("stats");
   const profileEl = document.getElementById("profile");
 
@@ -49,9 +50,9 @@
 
   function importance(c) {
     if (c <= 0) return 0;
-    if (c <= 2) return 0.08;
-    if (c <= 5) return 0.25;
-    if (c <= 9) return 0.5;
+    if (c <= 2) return 0.2;
+    if (c <= 5) return 0.4;
+    if (c <= 9) return 0.6;
     if (c <= 19) return 0.8;
     return 1;
   }
@@ -67,10 +68,7 @@
     data.days.forEach((day, i) => {
       const c = day.contributions;
       const imp = importance(c);
-      const roll = random();
       if (imp === 0) return;
-      if (c <= 2 && roll >= 0.18) return;
-      if (c <= 5 && roll >= 0.45) return;
 
       const g = GALAXIES[i % GALAXIES.length];
       let x = 0, y = 0;
@@ -107,6 +105,7 @@
       return {
         date: l.day.date,
         count: l.day.contributions,
+        repos: l.day.repos || [],
         hx, hy,
         x: prev ? prev.x : hx,
         y: prev ? prev.y : hy,
@@ -123,7 +122,7 @@
     });
 
     // Constellations: count>=3, nearest neighbours, max 2 links each.
-    const cand = stars.filter((s) => s.count >= 3);
+    const cand = stars.filter((s) => s.count >= 1);
     const maxD = 120 * sx;
     const pairs = [];
     for (let i = 0; i < cand.length; i++) {
@@ -334,10 +333,10 @@
       ctx.setLineDash([]);
       ctx.lineWidth = 0.6;
       for (const n of g) {
-        if (n.count < 6) continue;
+        if (n.count < 3) continue;
         ctx.strokeStyle = `rgba(165,180,252,${0.4 + n.glow * 0.4})`;
         ctx.beginPath();
-        ctx.arc(n.x + parallax.x * n.depth, n.y + parallax.y * n.depth, n.r + 5 + n.glow * 3, 0, Math.PI * 2);
+        ctx.arc(n.x + parallax.x * n.depth, n.y + parallax.y * n.depth, n.r * 3 * (1 + n.glow * 0.5) + 4, 0, Math.PI * 2);
         ctx.stroke();
       }
     }
@@ -372,15 +371,16 @@
       const x = s.x + parallax.x * s.depth;
       const y = s.y + parallax.y * s.depth;
       let alpha = s.base;
-      if (s.imp >= 0.5) alpha *= 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(t * 1.6 + s.phase * 3));
+      if (s.imp >= 0.4) alpha *= 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(t * 1.6 + s.phase * 3));
       alpha = Math.min(1, alpha + s.glow * 0.6);
 
       const r = s.r * (1 + s.glow * 1.2);
 
-      if (s.count >= 20 || s.glow > 0.02) {
-        const gr = r * (3 + s.glow * 3);
+      const big = s.count >= 3;
+      if (big || s.glow > 0.02) {
+        const gr = r * (big ? 3.8 : 3) + s.glow * r * 3;
         const g = ctx.createRadialGradient(x, y, 0, x, y, gr);
-        g.addColorStop(0, `rgba(167,139,250,${0.35 + s.glow * 0.4})`);
+        g.addColorStop(0, `rgba(167,139,250,${(big ? 0.2 + s.imp * 0.16 : 0.15) + s.glow * 0.35})`);
         g.addColorStop(1, "rgba(167,139,250,0)");
         ctx.fillStyle = g;
         ctx.beginPath();
@@ -390,7 +390,20 @@
 
       ctx.fillStyle = `rgba(255,255,255,${alpha})`;
       ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
+      if (big) {
+        const R = r * 3;
+        ctx.moveTo(x, y - R);
+        ctx.quadraticCurveTo(x, y, x + R, y);
+        ctx.quadraticCurveTo(x, y, x, y + R);
+        ctx.quadraticCurveTo(x, y, x - R, y);
+        ctx.quadraticCurveTo(x, y, x, y - R);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x, y, r * 0.55, 0, Math.PI * 2);
+      } else {
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+      }
       ctx.fill();
     }
 
@@ -414,6 +427,20 @@
     const y = hovered.y + parallax.y * hovered.depth;
     tipCount.textContent = `${hovered.count} contribution${hovered.count === 1 ? "" : "s"}`;
     tipDate.textContent = formatDate(hovered.date);
+    tipRepos.replaceChildren(
+      ...hovered.repos.slice(0, 4).map((r) => {
+        const el = document.createElement("span");
+        el.className = "repo";
+        el.textContent = r.name;
+        return el;
+      })
+    );
+    if (hovered.repos.length > 4) {
+      const more = document.createElement("span");
+      more.className = "repo";
+      more.textContent = `+${hovered.repos.length - 4} more`;
+      tipRepos.append(more);
+    }
     tooltip.hidden = false;
     const w = tooltip.offsetWidth / 2 + 8;
     tooltip.style.left = Math.min(Math.max(x, w), W - w) + "px";
@@ -445,7 +472,7 @@
         profileEl.href = `https://github.com/${data.username}`;
       }
       buildLayout();
-      statsEl.textContent = `${layout.length} STARS · ${data.days.length} DAYS`;
+      statsEl.textContent = `${data.total} CONTRIBUTIONS · ${layout.length} ACTIVE DAYS`;
       resize();
       requestAnimationFrame(frame);
     })

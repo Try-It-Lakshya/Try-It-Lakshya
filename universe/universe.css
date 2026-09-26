@@ -85,3 +85,16 @@ canvas {
 .tooltip[hidden] { display: none; }
 .tooltip strong { font-weight: 600; color: #fff; }
 .tooltip span { color: #a78bfa; }
+
+.tooltip .repos {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(139, 156, 255, 0.2);
+}
+
+.tooltip .repos:empty { display: none; }
+.tooltip .repo { color: #94a3b8; font-size: 10px; }

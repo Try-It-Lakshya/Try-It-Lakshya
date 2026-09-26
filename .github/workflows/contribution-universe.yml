@@ -1,6 +1,11 @@
 name: Generate Contribution Universe
 
 on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "assets/**"
+
   schedule:
     - cron: "0 3 * * *"
 
@@ -8,6 +13,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: contribution-universe
+  cancel-in-progress: true
 
 jobs:
   universe:
@@ -39,4 +48,5 @@ jobs:
           git diff --cached --quiet || \
             git commit -m "🌌 Update contribution universe"
 
+          git pull --rebase --autostash
           git push
