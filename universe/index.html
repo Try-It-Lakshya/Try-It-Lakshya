@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Contribution Universe</title>
+  <link rel="stylesheet" href="universe.css" />
+</head>
+<body>
+  <canvas id="universe" aria-label="Interactive GitHub contribution universe"></canvas>
+
+  <header class="hud">
+    <h1>CONTRIBUTION UNIVERSE</h1>
+    <p id="stats">loading…</p>
+  </header>
+
+  <div id="tooltip" class="tooltip" hidden>
+    <strong id="tip-count"></strong>
+    <span id="tip-date"></span>
+  </div>
+
+  <footer class="hud hud-bottom">
+    <span>move to explore · click or tap for a gravity wave · drag to disturb</span>
+    <a id="profile" href="#" rel="noopener"></a>
+  </footer>
+
+  <script src="universe.js"></script>
+</body>
+</html>

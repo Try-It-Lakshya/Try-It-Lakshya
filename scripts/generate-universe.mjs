@@ -56,7 +56,8 @@ const cx = WIDTH / 2;
 const cy = HEIGHT / 2;
 
 // Deterministic pseudo-random generator.
-// Same contribution data → same universe.
+// Same contribution data -> same universe.
+// NOTE: universe/universe.js mirrors this layout logic; keep them in sync.
 let seed = 42069;
 
 function random() {
@@ -64,309 +65,225 @@ function random() {
   return seed / 4294967296;
 }
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
+// contribution count -> visual importance (0 = invisible)
+function starImportance(count) {
+  if (count <= 0) return 0;
+  if (count <= 2) return 0.08;
+  if (count <= 5) return 0.25;
+  if (count <= 9) return 0.5;
+  if (count <= 19) return 0.8;
+  return 1.0;
 }
 
-// Generate positions around the universe.
-const stars = days.map((day, index) => {
-  const contribution = day.contributionCount;
+// Stars live in a few galaxies; the centre stays open.
+const galaxies = [
+  { x: 250, y: 285, radius: 170, rotation: -0.25 },
+  { x: 900, y: 175, radius: 150, rotation: 0.3 },
+  { x: 930, y: 405, radius: 120, rotation: -0.15 },
+  { x: 540, y: 105, radius: 100, rotation: 0.1 },
+];
 
-  // Distribute stars in a galaxy-like field.
-  const angle =
-    random() * Math.PI * 2 +
-    Math.sin(index * 0.13) * 0.8;
+// One random draw per day keeps the layout stable.
+const stars = [];
 
-  const radius =
-    50 +
-    Math.pow(random(), 0.65) * 500;
+days.forEach((day, index) => {
+  const count = day.contributionCount;
+  const importance = starImportance(count);
+  const roll = random();
 
-  const x =
-    cx +
-    Math.cos(angle) * radius +
-    (random() - 0.5) * 120;
+  if (importance === 0) return;
+  if (count <= 2 && roll >= 0.18) return;
+  if (count <= 5 && roll >= 0.45) return;
 
-  const y =
-    cy +
-    Math.sin(angle) * radius * 0.48 +
-    (random() - 0.5) * 180;
+  const galaxy = galaxies[index % galaxies.length];
 
-  const size =
-    contribution === 0
-      ? 0.7
-      : 1.2 + Math.min(contribution, 20) * 0.35;
+  let x, y;
+  for (let tries = 0; tries < 12; tries++) {
+    const angle = random() * Math.PI * 2;
+    const r = Math.sqrt(random()) * galaxy.radius;
+    const ex = Math.cos(angle) * r;
+    const ey = Math.sin(angle) * r * 0.45;
+    const cos = Math.cos(galaxy.rotation);
+    const sin = Math.sin(galaxy.rotation);
+    x = galaxy.x + ex * cos - ey * sin;
+    y = galaxy.y + ex * sin + ey * cos;
+    if (Math.hypot(x - cx, y - cy) > 95) break;
+  }
 
-  const opacity =
-    contribution === 0
-      ? 0.12
-      : 0.35 + Math.min(contribution, 15) / 20;
-
-  return {
+  stars.push({
     ...day,
     x,
     y,
-    size,
-    opacity,
-  };
+    importance,
+    size: 0.8 + importance * 2.8,
+    opacity: 0.15 + importance * 0.75,
+  });
 });
 
-// Only active stars participate in constellations.
-const activeStars = stars.filter(
-  (star) => star.contributionCount > 0
-);
+// Constellations: only meaningful days, nearest neighbours, max 2 links each.
+const candidates = stars.filter((star) => star.contributionCount >= 3);
+const degree = new Map();
+const pairs = [];
 
-// Connect nearby active stars.
+for (let i = 0; i < candidates.length; i++) {
+  for (let j = i + 1; j < candidates.length; j++) {
+    const d = Math.hypot(
+      candidates[i].x - candidates[j].x,
+      candidates[i].y - candidates[j].y
+    );
+    if (d < 120) pairs.push([candidates[i], candidates[j], d]);
+  }
+}
+
+pairs.sort((p, q) => p[2] - q[2]);
+
 const lines = [];
+const linked = [];
 
-for (let i = 0; i < activeStars.length; i++) {
-  const a = activeStars[i];
+for (const [a, b] of pairs) {
+  if ((degree.get(a) ?? 0) >= 3 || (degree.get(b) ?? 0) >= 3) continue;
+  degree.set(a, (degree.get(a) ?? 0) + 1);
+  degree.set(b, (degree.get(b) ?? 0) + 1);
+  lines.push(
+    `<line x1="${a.x.toFixed(2)}" y1="${a.y.toFixed(2)}" x2="${b.x.toFixed(2)}" y2="${b.y.toFixed(2)}" stroke="#8b9cff" stroke-width="0.6" opacity="0.28"/>`
+  );
+  linked.push([a, b]);
+}
 
-  for (let j = i + 1; j < activeStars.length; j++) {
-    const b = activeStars[j];
+// Group linked stars into clusters and ring them.
+const parent = new Map(stars.map((st) => [st, st]));
+const find = (n) => (parent.get(n) === n ? n : (parent.set(n, find(parent.get(n))), parent.get(n)));
+for (const [a, b] of linked) parent.set(find(a), find(b));
 
-    const dx = a.x - b.x;
-    const dy = a.y - b.y;
+const clusters = new Map();
+for (const [a, b] of linked) {
+  for (const n of [a, b]) {
+    const root = find(n);
+    if (!clusters.has(root)) clusters.set(root, new Set());
+    clusters.get(root).add(n);
+  }
+}
 
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    if (distance < 75) {
-      lines.push(`
-        <line
-          x1="${a.x.toFixed(2)}"
-          y1="${a.y.toFixed(2)}"
-          x2="${b.x.toFixed(2)}"
-          y2="${b.y.toFixed(2)}"
-          stroke="#8b5cf6"
-          stroke-width="0.7"
-          opacity="${clamp(
-            0.35 - distance / 250,
-            0.04,
-            0.22
-          )}"
-        />
-      `);
+const rings = [];
+for (const members of clusters.values()) {
+  const list = [...members];
+  if (list.length < 3) continue;
+  const mx = list.reduce((t, n) => t + n.x, 0) / list.length;
+  const my = list.reduce((t, n) => t + n.y, 0) / list.length;
+  const rad = Math.max(...list.map((n) => Math.hypot(n.x - mx, n.y - my))) + 18;
+  rings.push(`<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${rad.toFixed(1)}" fill="none" stroke="#8b9cff" stroke-width="0.5" stroke-dasharray="2 5" opacity="0.22"/>`);
+  for (const n of list) {
+    if (n.contributionCount >= 6) {
+      rings.push(`<circle cx="${n.x.toFixed(2)}" cy="${n.y.toFixed(2)}" r="${(n.size + 5).toFixed(1)}" fill="none" stroke="#a5b4fc" stroke-width="0.6" opacity="0.4"/>`);
     }
   }
 }
 
-// Nebula clouds.
-const nebulae = Array.from({ length: 12 }, () => {
-  const x = 100 + random() * 1000;
-  const y = 80 + random() * 360;
-
-  const rx = 70 + random() * 180;
-  const ry = 30 + random() * 90;
-
-  return `
-    <ellipse
-      cx="${x.toFixed(1)}"
-      cy="${y.toFixed(1)}"
-      rx="${rx.toFixed(1)}"
-      ry="${ry.toFixed(1)}"
-      fill="url(#nebula)"
-      opacity="${(0.06 + random() * 0.07).toFixed(3)}"
-      filter="url(#blur)"
-    />
-  `;
+// Faint background dust (decoration only).
+const dust = Array.from({ length: 220 }, () => {
+  const x = random() * WIDTH;
+  const y = random() * HEIGHT;
+  const r = 0.4 + random() * 0.5;
+  const o = 0.08 + random() * 0.2;
+  return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="#fff" opacity="${o.toFixed(2)}"/>`;
 }).join("");
 
-// Stars.
-const starElements = stars.map((star, index) => {
-  if (star.contributionCount === 0) {
-    return `
-      <circle
-        cx="${star.x.toFixed(2)}"
-        cy="${star.y.toFixed(2)}"
-        r="${star.size}"
-        fill="#ffffff"
-        opacity="${star.opacity}"
-      />
-    `;
-  }
-
-  const pulseDelay = `${(index % 9) * 0.4}s`;
-
-  return `
-    <circle
-      cx="${star.x.toFixed(2)}"
-      cy="${star.y.toFixed(2)}"
-      r="${star.size.toFixed(2)}"
-      fill="#ffffff"
-      opacity="${star.opacity.toFixed(2)}"
-      class="star"
-      style="animation-delay:${pulseDelay}"
-    />
-
-    ${
-      star.contributionCount >= 8
-        ? `
-      <circle
-        cx="${star.x.toFixed(2)}"
-        cy="${star.y.toFixed(2)}"
-        r="${(star.size * 3).toFixed(2)}"
-        fill="#a78bfa"
-        opacity="0.12"
-        filter="url(#glow)"
-      />
-    `
-        : ""
-    }
-  `;
+// A few subtle nebulae.
+const nebulae = Array.from({ length: 4 }, () => {
+  const x = 150 + random() * 900;
+  const y = 100 + random() * 320;
+  return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(100 + random() * 120).toFixed(1)}" ry="${(35 + random() * 50).toFixed(1)}" fill="url(#nebula)" opacity="0.62" filter="url(#blur)"/>`;
 }).join("");
+
+const starElements = stars
+  .map((star, index) => {
+    const glow =
+      star.contributionCount >= 20
+        ? `<circle cx="${star.x.toFixed(2)}" cy="${star.y.toFixed(2)}" r="${(star.size * 3.5).toFixed(2)}" fill="#a78bfa" opacity="0.22" filter="url(#glow)"/>`
+        : "";
+    const delay = `${(index % 9) * 0.4}s`;
+    return `${glow}<circle cx="${star.x.toFixed(2)}" cy="${star.y.toFixed(2)}" r="${star.size.toFixed(2)}" fill="#fff" opacity="${star.opacity.toFixed(2)}" ${star.importance >= 0.5 ? `class="star" style="animation-delay:${delay}"` : ""}/>`;
+  })
+  .join("\n    ");
 
 // Find strongest contribution day.
 const strongestDay = days.reduce(
   (best, day) =>
-    day.contributionCount > best.contributionCount
-      ? day
-      : best,
+    day.contributionCount > best.contributionCount ? day : best,
   days[0]
 );
 
 const svg = `
-<svg
-  xmlns="http://www.w3.org/2000/svg"
-  width="${WIDTH}"
-  height="${HEIGHT}"
-  viewBox="0 0 ${WIDTH} ${HEIGHT}"
-  role="img"
-  aria-label="GitHub contribution universe"
->
-
+<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" role="img" aria-label="GitHub contribution universe">
   <defs>
-
     <radialGradient id="background">
-      <stop offset="0%" stop-color="#111827"/>
-      <stop offset="55%" stop-color="#080b14"/>
+      <stop offset="0%" stop-color="#0d111d"/>
+      <stop offset="55%" stop-color="#070911"/>
       <stop offset="100%" stop-color="#030409"/>
     </radialGradient>
 
     <radialGradient id="nebula">
-      <stop offset="0%" stop-color="#8b5cf6"/>
-      <stop offset="45%" stop-color="#6366f1"/>
+      <stop offset="0%" stop-color="#6366f1" stop-opacity="0.35"/>
+      <stop offset="45%" stop-color="#4f46e5" stop-opacity="0.12"/>
       <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
     </radialGradient>
 
-    <filter id="blur">
+    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur stdDeviation="28"/>
     </filter>
 
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="7"/>
+    <filter id="glow" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="6"/>
     </filter>
-
   </defs>
 
-  <rect
-    width="${WIDTH}"
-    height="${HEIGHT}"
-    rx="24"
-    fill="url(#background)"
-  />
+  <rect width="${WIDTH}" height="${HEIGHT}" rx="24" fill="url(#background)"/>
 
-  <!-- Nebula -->
   ${nebulae}
-
-  <!-- Constellations -->
-  ${lines.join("")}
-
-  <!-- Stars -->
+  ${dust}
+  ${rings.join("\n  ")}
+  ${lines.join("\n  ")}
   ${starElements}
 
-  <!-- Center -->
-  <circle
-    cx="${cx}"
-    cy="${cy}"
-    r="2"
-    fill="#ffffff"
-    opacity="0.9"
-  />
+  <circle cx="${cx}" cy="${cy}" r="2" fill="#fff" opacity="0.9"/>
+  <circle cx="${cx}" cy="${cy}" r="35" fill="none" stroke="#8b9cff" stroke-width="0.5" opacity="0.12"/>
 
-  <circle
-    cx="${cx}"
-    cy="${cy}"
-    r="35"
-    fill="none"
-    stroke="#8b5cf6"
-    stroke-width="0.5"
-    opacity="0.15"
-  />
-
-  <circle
-    cx="${cx}"
-    cy="${cy}"
-    r="65"
-    fill="none"
-    stroke="#6366f1"
-    stroke-width="0.5"
-    opacity="0.08"
-  />
-
-  <!-- Label -->
-  <text
-    x="42"
-    y="54"
-    fill="#ffffff"
-    font-family="monospace"
-    font-size="14"
-    letter-spacing="3"
-    opacity="0.85"
-  >
-    CONTRIBUTION UNIVERSE
-  </text>
-
-  <text
-    x="42"
-    y="78"
-    fill="#94a3b8"
-    font-family="monospace"
-    font-size="11"
-  >
-    ${calendar.totalContributions} STARS · ${days.length} DAYS
-  </text>
-
-  <text
-    x="${WIDTH - 42}"
-    y="${HEIGHT - 30}"
-    text-anchor="end"
-    fill="#64748b"
-    font-family="monospace"
-    font-size="10"
-  >
-    github.com/${username}
-  </text>
+  <text x="42" y="54" fill="#fff" font-family="monospace" font-size="14" letter-spacing="3" opacity="0.85">CONTRIBUTION UNIVERSE</text>
+  <text x="42" y="78" fill="#94a3b8" font-family="monospace" font-size="11">${stars.length} STARS · ${days.length} DAYS</text>
+  <text x="${WIDTH - 42}" y="${HEIGHT - 30}" text-anchor="end" fill="#64748b" font-family="monospace" font-size="10">github.com/${username}</text>
 
   <style>
-    .star {
-      animation: pulse 4s ease-in-out infinite;
-      transform-origin: center;
-    }
-
-    @keyframes pulse {
-      0%, 100% {
-        opacity: 0.45;
-      }
-
-      50% {
-        opacity: 1;
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .star {
-        animation: none;
-      }
-    }
+    .star { animation: pulse 4s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .star { animation: none; } }
   </style>
-
 </svg>
 `;
 
 fs.mkdirSync("assets", { recursive: true });
 
 fs.writeFileSync(
-  "assets/contribution-universe.svg",
+  "assets/contribution-universe-preview.svg",
   svg
+);
+
+// Data for the interactive universe (universe/index.html).
+fs.writeFileSync(
+  "assets/contribution-data.json",
+  JSON.stringify(
+    {
+      username,
+      total: calendar.totalContributions,
+      generatedAt: new Date().toISOString(),
+      days: days.map((day) => ({
+        date: day.date,
+        contributions: day.contributionCount,
+        level: day.contributionLevel,
+      })),
+    },
+    null,
+    2
+  ) + "\n"
 );
 
 console.log(
