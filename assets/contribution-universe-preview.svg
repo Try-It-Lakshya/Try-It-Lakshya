@@ -29,6 +29,7 @@
   <circle cx="914.0" cy="169.0" r="116.3" fill="none" stroke="#8b9cff" stroke-width="0.5" stroke-dasharray="2 5" opacity="0.22"/>
   <circle cx="941.16" cy="176.71" r="11.4" fill="none" stroke="#a5b4fc" stroke-width="0.6" opacity="0.4"/>
   <circle cx="858.69" cy="156.80" r="9.8" fill="none" stroke="#a5b4fc" stroke-width="0.6" opacity="0.4"/>
+  <circle cx="875.80" cy="153.74" r="9.8" fill="none" stroke="#a5b4fc" stroke-width="0.6" opacity="0.4"/>
   <circle cx="825.10" cy="175.03" r="9.8" fill="none" stroke="#a5b4fc" stroke-width="0.6" opacity="0.4"/>
   <circle cx="884.96" cy="235.95" r="9.8" fill="none" stroke="#a5b4fc" stroke-width="0.6" opacity="0.4"/>
   <circle cx="527.5" cy="98.1" r="109.2" fill="none" stroke="#8b9cff" stroke-width="0.5" stroke-dasharray="2 5" opacity="0.22"/>
@@ -132,13 +133,14 @@
     <circle cx="953.71" cy="417.80" r="1.36" fill="#fff" opacity="0.30" />
     <circle cx="528.03" cy="85.20" r="9.79" fill="#a78bfa" opacity="0.22" filter="url(#glow)"/>
     <g transform="translate(528.03 85.20)" class="star" style="animation-delay:2.4000000000000004s"><path d="M0,-5.76 Q0,0 5.76,0 Q0,0 0,5.76 Q0,0 -5.76,0 Q0,0 0,-5.76Z" fill="#fff" opacity="0.45"/><circle r="1.06" fill="#fff"/></g>
-    <circle cx="875.80" cy="153.74" r="1.36" fill="#fff" opacity="0.30" />
+    <circle cx="875.80" cy="153.74" r="9.79" fill="#a78bfa" opacity="0.22" filter="url(#glow)"/>
+    <g transform="translate(875.80 153.74)" class="star" style="animation-delay:2.8000000000000003s"><path d="M0,-5.76 Q0,0 5.76,0 Q0,0 0,5.76 Q0,0 -5.76,0 Q0,0 0,-5.76Z" fill="#fff" opacity="0.45"/><circle r="1.06" fill="#fff"/></g>
 
   <circle cx="600" cy="260" r="2" fill="#fff" opacity="0.9"/>
   <circle cx="600" cy="260" r="35" fill="none" stroke="#8b9cff" stroke-width="0.5" opacity="0.12"/>
 
   <text x="42" y="54" fill="#fff" font-family="monospace" font-size="14" letter-spacing="3" opacity="0.85">CONTRIBUTION UNIVERSE</text>
-  <text x="42" y="78" fill="#94a3b8" font-family="monospace" font-size="11">72 CONTRIBUTIONS · 35 ACTIVE DAYS</text>
+  <text x="42" y="78" fill="#94a3b8" font-family="monospace" font-size="11">76 CONTRIBUTIONS · 35 ACTIVE DAYS</text>
   <text x="1158" y="490" text-anchor="end" fill="#64748b" font-family="monospace" font-size="10">github.com/try-it-lakshya</text>
 
   <style>
