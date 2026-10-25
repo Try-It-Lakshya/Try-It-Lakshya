@@ -1,50 +1,8 @@
 {
   "username": "try-it-lakshya",
   "total": 79,
-  "generatedAt": "2026-10-24T07:42:14.547Z",
+  "generatedAt": "2026-10-25T07:54:04.172Z",
   "days": [
-    {
-      "date": "2025-10-19",
-      "contributions": 0,
-      "level": "NONE",
-      "repos": []
-    },
-    {
-      "date": "2025-10-20",
-      "contributions": 0,
-      "level": "NONE",
-      "repos": []
-    },
-    {
-      "date": "2025-10-21",
-      "contributions": 0,
-      "level": "NONE",
-      "repos": []
-    },
-    {
-      "date": "2025-10-22",
-      "contributions": 0,
-      "level": "NONE",
-      "repos": []
-    },
-    {
-      "date": "2025-10-23",
-      "contributions": 0,
-      "level": "NONE",
-      "repos": []
-    },
-    {
-      "date": "2025-10-24",
-      "contributions": 0,
-      "level": "NONE",
-      "repos": []
-    },
-    {
-      "date": "2025-10-25",
-      "contributions": 0,
-      "level": "NONE",
-      "repos": []
-    },
     {
       "date": "2025-10-26",
       "contributions": 0,
@@ -2413,6 +2371,12 @@
     },
     {
       "date": "2026-10-24",
+      "contributions": 0,
+      "level": "NONE",
+      "repos": []
+    },
+    {
+      "date": "2026-10-25",
       "contributions": 0,
       "level": "NONE",
       "repos": []
