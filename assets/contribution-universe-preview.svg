@@ -141,7 +141,7 @@
   <circle cx="600" cy="260" r="35" fill="none" stroke="#8b9cff" stroke-width="0.5" opacity="0.12"/>
 
   <text x="42" y="54" fill="#fff" font-family="monospace" font-size="14" letter-spacing="3" opacity="0.85">CONTRIBUTION UNIVERSE</text>
-  <text x="42" y="78" fill="#94a3b8" font-family="monospace" font-size="11">79 CONTRIBUTIONS · 35 ACTIVE DAYS</text>
+  <text x="42" y="78" fill="#94a3b8" font-family="monospace" font-size="11">75 CONTRIBUTIONS · 35 ACTIVE DAYS</text>
   <text x="1158" y="490" text-anchor="end" fill="#64748b" font-family="monospace" font-size="10">github.com/try-it-lakshya</text>
 
   <style>
